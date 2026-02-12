@@ -47,6 +47,100 @@ body {
   letter-spacing: 3px;
 }
 
+/* Toolbar */
+#toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 24px;
+  background: #0a1e3a;
+  border-bottom: 1px solid #1a4a8a;
+}
+
+#station-search-wrap {
+  position: relative;
+  flex: 1;
+  max-width: 360px;
+}
+
+#station-search {
+  width: 100%;
+  padding: 8px 12px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 16px;
+  color: #ffd000;
+  background: #111;
+  border: 1px solid #444;
+  border-radius: 4px;
+  outline: none;
+}
+
+#station-search:focus {
+  border-color: #ff9d00;
+  box-shadow: 0 0 6px rgba(255, 157, 0, 0.3);
+}
+
+#station-search::placeholder {
+  color: #666;
+}
+
+#station-results {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  max-height: 280px;
+  overflow-y: auto;
+  background: #1a1a1a;
+  border: 1px solid #444;
+  border-top: none;
+  border-radius: 0 0 4px 4px;
+  z-index: 100;
+}
+
+#station-results .station-option {
+  padding: 8px 12px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 14px;
+  color: #ccc;
+  cursor: pointer;
+}
+
+#station-results .station-option:hover,
+#station-results .station-option.active {
+  background: #0d2847;
+  color: #ffd000;
+}
+
+#station-results .station-option .crs {
+  color: #888;
+  margin-left: 8px;
+}
+
+#calling-at-toggle {
+  padding: 8px 16px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 14px;
+  color: #888;
+  background: #1a1a1a;
+  border: 1px solid #444;
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.2s, border-color 0.2s;
+}
+
+#calling-at-toggle:hover {
+  border-color: #666;
+  color: #aaa;
+}
+
+#calling-at-toggle.active {
+  color: #00cc44;
+  border-color: #00cc44;
+}
+
 /* Column headers */
 #column-headers {
   display: flex;
@@ -111,13 +205,18 @@ body {
   justify-content: flex-end;
 }
 
-/* Calling at row */
+/* Calling at row - hidden by default, toggled via JS */
 .calling-at {
+  display: none;
   width: 100%;
   padding: 2px 0 4px 80px;
   font-size: 13px;
   color: #777;
   letter-spacing: 0.5px;
+}
+
+.show-calling-at .calling-at {
+  display: block;
 }
 
 /* Status colours */
@@ -207,6 +306,9 @@ body {
 @media (max-width: 700px) {
   #station-name { font-size: 18px; }
   #clock { font-size: 22px; }
+  #toolbar { padding: 8px 12px; flex-wrap: wrap; }
+  #station-search-wrap { max-width: 100%; }
+  #calling-at-toggle { font-size: 12px; padding: 6px 10px; }
   .departure-row { font-size: 16px; padding: 10px 12px; }
   #column-headers { padding: 8px 12px; font-size: 12px; }
   .col-operator { display: none; }
