@@ -1,5 +1,3 @@
-import $ from 'jquery'
-
 // To make live requests get your app_id and app_key by signing up at https://developer.transportapi.com/signup
 // and filling them here
 const appId = '126b088f'
