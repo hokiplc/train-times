@@ -1,7 +1,23 @@
 const appId = '126b088f'
 const appKey = 'c275b55f4eec9754dc1a20eff920143c'
-const trainStation = 'TRO'
+const DEFAULT_STATION = 'TRO'
 const REFRESH_INTERVAL = 30 // seconds
+
+let currentStation = DEFAULT_STATION
+let stations = []
+let showCallingAt = false
+let refreshCountdown = REFRESH_INTERVAL
+let activeResultIndex = -1
+
+// Read station from URL hash, e.g. #TRO
+function getStationFromHash() {
+  const hash = window.location.hash.replace('#', '').toUpperCase()
+  return hash.length === 3 ? hash : null
+}
+
+function setStationHash(crs) {
+  window.location.hash = crs
+}
 
 // Clock
 function updateClock() {
@@ -15,7 +31,6 @@ setInterval(updateClock, 1000)
 updateClock()
 
 // Countdown to next refresh
-let refreshCountdown = REFRESH_INTERVAL
 function updateCountdown() {
   refreshCountdown--
   if (refreshCountdown <= 0) {
@@ -25,6 +40,123 @@ function updateCountdown() {
   $('#next-refresh').text('Refreshing in ' + refreshCountdown + 's')
 }
 setInterval(updateCountdown, 1000)
+
+// Load stations list
+function loadStations() {
+  $.getJSON('stations.json')
+    .done(function (data) {
+      stations = data
+    })
+    .fail(function () {
+      console.warn('Could not load stations.json')
+    })
+}
+
+// Station search
+function initSearch() {
+  const $input = $('#station-search')
+  const $results = $('#station-results')
+
+  $input.on('input', function () {
+    const query = $(this).val().trim().toLowerCase()
+    activeResultIndex = -1
+
+    if (query.length < 2) {
+      $results.hide().empty()
+      return
+    }
+
+    // Filter: match station name or CRS code
+    const matches = stations.filter(function (s) {
+      return s.stationName.toLowerCase().indexOf(query) !== -1 ||
+             s.crsCode.toLowerCase() === query
+    }).slice(0, 20)
+
+    if (matches.length === 0) {
+      $results.hide().empty()
+      return
+    }
+
+    const html = matches.map(function (s, i) {
+      return '<div class="station-option" data-crs="' + s.crsCode + '" data-index="' + i + '">' +
+        s.stationName + '<span class="crs">(' + s.crsCode + ')</span></div>'
+    }).join('')
+
+    $results.html(html).show()
+  })
+
+  // Keyboard navigation
+  $input.on('keydown', function (e) {
+    const $options = $results.find('.station-option')
+    if ($options.length === 0) return
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      activeResultIndex = Math.min(activeResultIndex + 1, $options.length - 1)
+      $options.removeClass('active').eq(activeResultIndex).addClass('active')
+      scrollOptionIntoView($results, $options.eq(activeResultIndex))
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      activeResultIndex = Math.max(activeResultIndex - 1, 0)
+      $options.removeClass('active').eq(activeResultIndex).addClass('active')
+      scrollOptionIntoView($results, $options.eq(activeResultIndex))
+    } else if (e.key === 'Enter') {
+      e.preventDefault()
+      if (activeResultIndex >= 0) {
+        $options.eq(activeResultIndex).trigger('click')
+      }
+    } else if (e.key === 'Escape') {
+      $results.hide().empty()
+      $input.blur()
+    }
+  })
+
+  // Click a result
+  $results.on('click', '.station-option', function () {
+    const crs = $(this).data('crs')
+    selectStation(crs)
+    $input.val('')
+    $results.hide().empty()
+  })
+
+  // Close results when clicking outside
+  $(document).on('click', function (e) {
+    if (!$(e.target).closest('#station-search-wrap').length) {
+      $results.hide().empty()
+    }
+  })
+}
+
+function scrollOptionIntoView($container, $option) {
+  if (!$option.length) return
+  const optionTop = $option.position().top
+  const optionHeight = $option.outerHeight()
+  const containerHeight = $container.height()
+  const scrollTop = $container.scrollTop()
+
+  if (optionTop < 0) {
+    $container.scrollTop(scrollTop + optionTop)
+  } else if (optionTop + optionHeight > containerHeight) {
+    $container.scrollTop(scrollTop + optionTop + optionHeight - containerHeight)
+  }
+}
+
+function selectStation(crs) {
+  currentStation = crs
+  setStationHash(crs)
+  refreshCountdown = REFRESH_INTERVAL
+  fetchDepartures()
+}
+
+// Calling-at toggle
+function initCallingAtToggle() {
+  $('#calling-at-toggle').on('click', function () {
+    showCallingAt = !showCallingAt
+    $(this).text('Calling at: ' + (showCallingAt ? 'ON' : 'OFF'))
+    $(this).toggleClass('active', showCallingAt)
+    $('#departures').toggleClass('show-calling-at', showCallingAt)
+  })
+}
 
 // Determine status text and CSS class from API departure data
 function getStatus(dep) {
@@ -108,15 +240,15 @@ function buildRow(dep) {
 // Main fetch
 function fetchDepartures() {
   const url = 'https://transportapi.com/v3/uk/train/station_timetables/' +
-    trainStation + '.json?app_id=' + appId + '&app_key=' + appKey +
+    currentStation + '.json?app_id=' + appId + '&app_key=' + appKey +
     '&train_status=passenger&live=true&station_detail=calling_at'
 
   $('#departures').html('<div class="loading-message">Loading departures...</div>')
 
   $.getJSON(url)
     .done(function (data) {
-      $('#station-name').text(data.station_name || trainStation)
-      document.title = 'Live Departures - ' + (data.station_name || trainStation)
+      $('#station-name').text(data.station_name || currentStation)
+      document.title = 'Live Departures - ' + (data.station_name || currentStation)
 
       const departures = data.departures && data.departures.all
       if (!departures || departures.length === 0) {
@@ -126,7 +258,9 @@ function fetchDepartures() {
       }
 
       const rows = departures.map(buildRow).join('')
-      $('#departures').html(rows)
+      const $dep = $('#departures')
+      $dep.html(rows)
+      if (showCallingAt) $dep.addClass('show-calling-at')
       $('#updated').text('Updated: ' + new Date().toLocaleTimeString())
     })
     .fail(function (jqXHR) {
@@ -138,5 +272,29 @@ function fetchDepartures() {
     })
 }
 
-// Initial load
-fetchDepartures()
+// Handle browser back/forward with hash change
+$(window).on('hashchange', function () {
+  const crs = getStationFromHash()
+  if (crs && crs !== currentStation) {
+    currentStation = crs
+    refreshCountdown = REFRESH_INTERVAL
+    fetchDepartures()
+  }
+})
+
+// Initialise
+$(function () {
+  loadStations()
+  initSearch()
+  initCallingAtToggle()
+
+  // Use hash station if present, otherwise default
+  const hashStation = getStationFromHash()
+  if (hashStation) {
+    currentStation = hashStation
+  } else {
+    setStationHash(currentStation)
+  }
+
+  fetchDepartures()
+})
