@@ -8,6 +8,9 @@ let stations = []
 let showCallingAt = false
 let refreshCountdown = REFRESH_INTERVAL
 let activeResultIndex = -1
+let lastDepartures = [] // store latest departures for calling-at fetching
+let lastDate = ''       // date from latest API response
+let callingAtCache = {} // keyed by train_uid:date
 
 // Read station from URL hash, e.g. #TRO
 function getStationFromHash() {
@@ -144,6 +147,7 @@ function scrollOptionIntoView($container, $option) {
 function selectStation(crs) {
   currentStation = crs
   setStationHash(crs)
+  callingAtCache = {}
   refreshCountdown = REFRESH_INTERVAL
   fetchDepartures()
 }
@@ -155,27 +159,89 @@ function initCallingAtToggle() {
     $(this).text('Calling at: ' + (showCallingAt ? 'ON' : 'OFF'))
     $(this).toggleClass('active', showCallingAt)
     $('#departures').toggleClass('show-calling-at', showCallingAt)
+
+    if (showCallingAt) {
+      fetchCallingAtForAll()
+    }
+  })
+}
+
+// Fetch the service timetable for a single departure and update its row
+function fetchCallingAtForDeparture(dep, date) {
+  var cacheKey = dep.train_uid + ':' + date
+  var $row = $('[data-uid="' + dep.train_uid + '"]')
+  var $callingAt = $row.find('.calling-at')
+
+  // Already cached
+  if (callingAtCache[cacheKey]) {
+    $callingAt.text(callingAtCache[cacheKey])
+    return
+  }
+
+  $callingAt.text('Loading...')
+
+  var url = 'https://transportapi.com/v3/uk/train/service_timetables/' +
+    dep.train_uid + ':' + date + '.json?app_id=' + appId +
+    '&app_key=' + appKey + '&live=true'
+
+  $.getJSON(url)
+    .done(function (data) {
+      var stops = data.stops || []
+      // Find current station in the stops list, then show all stops after it
+      var foundCurrent = false
+      var callingPoints = []
+      for (var i = 0; i < stops.length; i++) {
+        if (foundCurrent) {
+          callingPoints.push(stops[i].station_name)
+        }
+        if (stops[i].station_code === currentStation) {
+          foundCurrent = true
+        }
+      }
+
+      var text = callingPoints.length > 0
+        ? 'Calling at: ' + callingPoints.join(', ')
+        : 'No calling points'
+
+      callingAtCache[cacheKey] = text
+
+      // Re-find the row in case DOM was refreshed
+      var $updatedRow = $('[data-uid="' + dep.train_uid + '"]')
+      $updatedRow.find('.calling-at').text(text)
+    })
+    .fail(function () {
+      var $updatedRow = $('[data-uid="' + dep.train_uid + '"]')
+      $updatedRow.find('.calling-at').text('Unavailable')
+    })
+}
+
+// Fetch calling-at for all currently displayed departures
+function fetchCallingAtForAll() {
+  if (!lastDepartures.length || !lastDate) return
+
+  lastDepartures.forEach(function (dep) {
+    fetchCallingAtForDeparture(dep, lastDate)
   })
 }
 
 // Determine status text and CSS class from API departure data
 function getStatus(dep) {
-  const status = (dep.status || '').toUpperCase()
+  var status = (dep.status || '').toUpperCase()
 
   if (status === 'CANCELLED') {
     return { text: 'Cancelled', cssClass: 'status-cancelled' }
   }
   if (status === 'EARLY') {
-    const expected = dep.expected_departure_time || dep.aimed_departure_time
+    var expected = dep.expected_departure_time || dep.aimed_departure_time
     return { text: expected === dep.aimed_departure_time ? 'On time' : 'Early ' + expected, cssClass: 'status-early' }
   }
   if (status === 'ON TIME' || status === 'RIGHT TIME') {
     return { text: 'On time', cssClass: 'status-on-time' }
   }
   if (status === 'LATE') {
-    const expected = dep.expected_departure_time
-    if (expected) {
-      return { text: 'Exp ' + expected, cssClass: 'status-late' }
+    var exp = dep.expected_departure_time
+    if (exp) {
+      return { text: 'Exp ' + exp, cssClass: 'status-late' }
     }
     return { text: 'Delayed', cssClass: 'status-delayed' }
   }
@@ -203,45 +269,33 @@ function isImminent(dep) {
   return dep.best_departure_estimate_mins != null && dep.best_departure_estimate_mins <= 1
 }
 
-// Build calling-at text from station_detail calling_at data
-function getCallingAt(dep) {
-  if (!dep.calling_at_list) return ''
-  const stops = dep.calling_at_list
-    .map(function (stop) { return stop.station_name })
-    .join(', ')
-  return stops ? 'Calling at: ' + stops : ''
-}
-
 // Build a single departure row
-function buildRow(dep) {
-  const status = getStatus(dep)
-  const imminent = isImminent(dep)
-  const callingAt = getCallingAt(dep)
+function buildRow(dep, date) {
+  var status = getStatus(dep)
+  var imminent = isImminent(dep)
+  var cacheKey = dep.train_uid + ':' + date
+  var cachedCallingAt = callingAtCache[cacheKey] || ''
 
-  let rowClass = 'departure-row'
+  var rowClass = 'departure-row'
   if (status.cssClass === 'status-cancelled') rowClass += ' status-cancelled'
   if (imminent) rowClass += ' imminent'
 
-  let html = '<div class="' + rowClass + '">'
+  var html = '<div class="' + rowClass + '" data-uid="' + dep.train_uid + '">'
   html += '<span class="col-time">' + dep.aimed_departure_time + '</span>'
   html += '<span class="col-destination">' + dep.destination_name + '</span>'
   html += '<span class="col-plat">' + (dep.platform || '-') + '</span>'
   html += '<span class="col-expected ' + status.cssClass + '">' + status.text + '</span>'
   html += '<span class="col-operator">' + (dep.operator_name || '') + '</span>'
-
-  if (callingAt) {
-    html += '<div class="calling-at">' + callingAt + '</div>'
-  }
-
+  html += '<div class="calling-at">' + cachedCallingAt + '</div>'
   html += '</div>'
   return html
 }
 
 // Main fetch
 function fetchDepartures() {
-  const url = 'https://transportapi.com/v3/uk/train/station_timetables/' +
+  var url = 'https://transportapi.com/v3/uk/train/station_timetables/' +
     currentStation + '.json?app_id=' + appId + '&app_key=' + appKey +
-    '&train_status=passenger&live=true&station_detail=calling_at'
+    '&train_status=passenger&live=true'
 
   $('#departures').html('<div class="loading-message">Loading departures...</div>')
 
@@ -250,21 +304,31 @@ function fetchDepartures() {
       $('#station-name').text(data.station_name || currentStation)
       document.title = 'Live Departures - ' + (data.station_name || currentStation)
 
-      const departures = data.departures && data.departures.all
+      var departures = data.departures && data.departures.all
       if (!departures || departures.length === 0) {
         $('#departures').html('<div class="loading-message">No departures found</div>')
         $('#updated').text('Updated: ' + new Date().toLocaleTimeString())
+        lastDepartures = []
         return
       }
 
-      const rows = departures.map(buildRow).join('')
-      const $dep = $('#departures')
+      lastDepartures = departures
+      lastDate = data.date || ''
+
+      var rows = departures.map(function (dep) {
+        return buildRow(dep, lastDate)
+      }).join('')
+
+      var $dep = $('#departures')
       $dep.html(rows)
-      if (showCallingAt) $dep.addClass('show-calling-at')
+      if (showCallingAt) {
+        $dep.addClass('show-calling-at')
+        fetchCallingAtForAll()
+      }
       $('#updated').text('Updated: ' + new Date().toLocaleTimeString())
     })
     .fail(function (jqXHR) {
-      let msg = 'Failed to load departures'
+      var msg = 'Failed to load departures'
       if (jqXHR.status === 429) msg = 'Rate limited - will retry shortly'
       else if (jqXHR.status === 401 || jqXHR.status === 403) msg = 'Invalid API credentials'
       else if (jqXHR.status === 0) msg = 'Network error - check your connection'
@@ -274,9 +338,10 @@ function fetchDepartures() {
 
 // Handle browser back/forward with hash change
 $(window).on('hashchange', function () {
-  const crs = getStationFromHash()
+  var crs = getStationFromHash()
   if (crs && crs !== currentStation) {
     currentStation = crs
+    callingAtCache = {}
     refreshCountdown = REFRESH_INTERVAL
     fetchDepartures()
   }
@@ -289,7 +354,7 @@ $(function () {
   initCallingAtToggle()
 
   // Use hash station if present, otherwise default
-  const hashStation = getStationFromHash()
+  var hashStation = getStationFromHash()
   if (hashStation) {
     currentStation = hashStation
   } else {
