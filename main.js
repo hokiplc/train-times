@@ -4,9 +4,7 @@ const appId = '126b088f'
 const appKey = 'c275b55f4eec9754dc1a20eff920143c'
 const trainStation = 'TRO'
 
-const url = (appId === '126b088f' || appKey === 'c275b55f4eec9754dc1a20eff920143c')
-  ? 'response.json'
-  : `https://transportapi.com/v3/uk/train/station_timetables/${trainStation}.json?app_id=${appId}&app_key=${appKey}&train_status=passenger`
+const url = `https://transportapi.com/v3/uk/train/station_timetables/${trainStation}.json?app_id=${appId}&app_key=${appKey}&train_status=passenger`
 
 console.log(window.location)
 
