@@ -1,11 +1,217 @@
-table, th, td {
-  border: 1px solid black;
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
 }
 
-table {
-  border-collapse: collapse;
+body {
+  background: #0a0a0a;
+  font-family: 'Share Tech Mono', monospace;
+  color: #ff9d00;
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  padding: 20px;
 }
 
-th {
-  background-color: gray;
+#board {
+  width: 100%;
+  max-width: 960px;
+  background: #111;
+  border: 3px solid #333;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 0 40px rgba(255, 157, 0, 0.08);
+}
+
+/* Header */
+#header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 24px;
+  background: #0d2847;
+  border-bottom: 3px solid #1a4a8a;
+}
+
+#station-name {
+  font-size: 28px;
+  color: #fff;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+
+#clock {
+  font-size: 32px;
+  color: #fff;
+  letter-spacing: 3px;
+}
+
+/* Column headers */
+#column-headers {
+  display: flex;
+  padding: 10px 24px;
+  background: #1a1a1a;
+  border-bottom: 2px solid #333;
+  font-size: 14px;
+  color: #aaa;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.col-time { width: 80px; flex-shrink: 0; }
+.col-destination { flex: 1; }
+.col-plat { width: 60px; flex-shrink: 0; text-align: center; }
+.col-expected { width: 120px; flex-shrink: 0; text-align: center; }
+.col-operator { width: 140px; flex-shrink: 0; text-align: right; }
+
+/* Departures list */
+#departures {
+  min-height: 400px;
+}
+
+.departure-row {
+  display: flex;
+  flex-wrap: wrap;
+  padding: 12px 24px;
+  border-bottom: 1px solid #222;
+  font-size: 20px;
+  animation: fadeIn 0.3s ease-in;
+}
+
+.departure-row:nth-child(odd) {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.departure-row .col-time {
+  color: #ff9d00;
+  font-weight: bold;
+}
+
+.departure-row .col-destination {
+  color: #ffd000;
+}
+
+.departure-row .col-plat {
+  color: #fff;
+  text-align: center;
+}
+
+.departure-row .col-expected {
+  text-align: center;
+  font-weight: bold;
+}
+
+.departure-row .col-operator {
+  color: #888;
+  font-size: 14px;
+  text-align: right;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+/* Calling at row */
+.calling-at {
+  width: 100%;
+  padding: 2px 0 4px 80px;
+  font-size: 13px;
+  color: #777;
+  letter-spacing: 0.5px;
+}
+
+/* Status colours */
+.status-on-time {
+  color: #00cc44;
+}
+
+.status-early {
+  color: #00cc44;
+}
+
+.status-late {
+  color: #ff3333;
+}
+
+.status-cancelled {
+  color: #ff3333;
+}
+
+.status-cancelled .col-destination,
+.status-cancelled .col-time {
+  text-decoration: line-through;
+  opacity: 0.5;
+}
+
+.status-cancelled .col-expected {
+  text-decoration: none;
+  color: #ff3333;
+  font-weight: bold;
+}
+
+.status-delayed {
+  color: #ff9d00;
+}
+
+.status-starts-here {
+  color: #4488ff;
+}
+
+.status-no-report {
+  color: #888;
+}
+
+/* Flashing for imminent departures */
+.imminent .col-time,
+.imminent .col-destination {
+  animation: blink 1s step-start infinite;
+}
+
+@keyframes blink {
+  50% { opacity: 0.3; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Footer */
+#footer {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 24px;
+  background: #1a1a1a;
+  border-top: 2px solid #333;
+  font-size: 12px;
+  color: #666;
+}
+
+/* Loading / error states */
+.loading-message,
+.error-message {
+  padding: 40px 24px;
+  text-align: center;
+  font-size: 18px;
+}
+
+.loading-message {
+  color: #ff9d00;
+}
+
+.error-message {
+  color: #ff3333;
+}
+
+/* Responsive */
+@media (max-width: 700px) {
+  #station-name { font-size: 18px; }
+  #clock { font-size: 22px; }
+  .departure-row { font-size: 16px; padding: 10px 12px; }
+  #column-headers { padding: 8px 12px; font-size: 12px; }
+  .col-operator { display: none; }
+  .col-expected { width: 90px; }
+  .calling-at { padding-left: 0; font-size: 11px; }
+  #header { padding: 12px; }
+  #footer { padding: 8px 12px; }
 }
