@@ -4,6 +4,7 @@ const DEFAULT_STATION = 'TRO'
 const REFRESH_INTERVAL = 30 // seconds
 
 let currentStation = DEFAULT_STATION
+let maxDepartures = 0 // 0 = show all
 let stations = []
 let showCallingAt = false
 let refreshCountdown = REFRESH_INTERVAL
@@ -11,6 +12,16 @@ let activeResultIndex = -1
 let lastDepartures = [] // store latest departures for calling-at fetching
 let lastDate = ''       // date from latest API response
 let callingAtCache = {} // keyed by train_uid:date
+
+// Read config from URL query parameters and hash
+// Supports: ?stops=8&callingat=on  and  #TRO  (or combined: ?stops=8#TRO)
+function getUrlParams() {
+  var params = new URLSearchParams(window.location.search)
+  return {
+    stops: parseInt(params.get('stops'), 10) || 0,
+    callingat: params.get('callingat')
+  }
+}
 
 // Read station from URL hash, e.g. #TRO
 function getStationFromHash() {
@@ -312,6 +323,10 @@ function fetchDepartures() {
         return
       }
 
+      if (maxDepartures > 0) {
+        departures = departures.slice(0, maxDepartures)
+      }
+
       lastDepartures = departures
       lastDate = data.date || ''
 
@@ -352,6 +367,17 @@ $(function () {
   loadStations()
   initSearch()
   initCallingAtToggle()
+
+  // Read URL query parameters (?stops=8&callingat=on)
+  var params = getUrlParams()
+  if (params.stops > 0) {
+    maxDepartures = params.stops
+  }
+  if (params.callingat === 'on') {
+    showCallingAt = true
+    $('#calling-at-toggle').text('Calling at: ON').addClass('active')
+    $('#departures').addClass('show-calling-at')
+  }
 
   // Use hash station if present, otherwise default
   var hashStation = getStationFromHash()
