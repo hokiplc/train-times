@@ -81,7 +81,8 @@ systemctl enable train-times-web.service
 # ── 5. Install kiosk launcher ───────────────────────────────────────────────
 echo "[5/7] Configuring kiosk auto-start..."
 cp "$SCRIPT_DIR/kiosk-start.sh" /usr/local/bin/kiosk-start.sh
-chmod +x /usr/local/bin/kiosk-start.sh
+cp "$SCRIPT_DIR/kiosk-browser.sh" /usr/local/bin/kiosk-browser.sh
+chmod +x /usr/local/bin/kiosk-start.sh /usr/local/bin/kiosk-browser.sh
 
 # Auto-login kiosk user on tty1
 mkdir -p /etc/systemd/system/getty@tty1.service.d
